@@ -64,4 +64,4 @@ pip install -r requirements.txt
 
 ---
 
-*Part of the Caeliai Genesis research series investigating computer vision approaches to fashion and design understanding.* 
+*Part of the Caeliai Genesis research series investigating computer vision approaches to fashion and design understanding.*
