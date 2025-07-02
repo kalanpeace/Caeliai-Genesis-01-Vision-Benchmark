@@ -1,0 +1,668 @@
+import gradio as gr
+import json
+import os
+from pathlib import Path
+from PIL import Image, ImageDraw
+import tempfile
+
+# Custom CSS for dark theme with exact color specifications
+custom_css = """
+/* Main background */
+.gradio-container {
+    background-color: #121212 !important;
+    color: #F5F5F5 !important;
+}
+
+/* Content cards */
+.gradio-group {
+    background-color: #1E1E1E !important;
+    border-radius: 15px !important;
+    border: 1px solid #4A90E2 !important;
+    padding: 20px !important;
+    margin: 15px 0 !important;
+}
+
+/* Typography */
+.gradio-group h1, .gradio-group h2, .gradio-group h3 {
+    color: #F5F5F5 !important;
+    margin-bottom: 10px !important;
+}
+
+.gradio-group h1 {
+    font-size: 24px !important;
+    font-weight: bold !important;
+}
+
+.gradio-group h2 {
+    font-size: 20px !important;
+    font-weight: 600 !important;
+}
+
+.gradio-group h3 {
+    font-size: 16px !important;
+    font-weight: 500 !important;
+}
+
+.gradio-group p {
+    color: #AAAAAA !important;
+    line-height: 1.6 !important;
+    margin-bottom: 15px !important;
+}
+
+/* Dropdown styling */
+.gradio-dropdown {
+    background-color: #1E1E1E !important;
+    border: 1px solid #4A90E2 !important;
+    border-radius: 8px !important;
+    color: #F5F5F5 !important;
+}
+
+/* Image and gallery styling */
+.gradio-image, .gradio-gallery {
+    background-color: transparent !important;
+    border: none !important;
+}
+
+.gradio-gallery .thumbnail {
+    border-radius: 8px !important;
+}
+
+/* Gallery captions */
+.gradio-gallery .caption {
+    font-size: 0.8rem !important;
+    color: #AAAAAA !important;
+    text-align: center !important;
+    margin-top: 5px !important;
+}
+
+/* Button styling */
+.gradio-button {
+    background-color: #4A90E2 !important;
+    border: none !important;
+    border-radius: 8px !important;
+    color: #F5F5F5 !important;
+    font-weight: 500 !important;
+    padding: 10px 20px !important;
+}
+
+.gradio-button:hover {
+    background-color: #5BA0F2 !important;
+}
+
+/* Text inputs and textareas */
+.gradio-textbox, .gradio-textarea {
+    background-color: #1E1E1E !important;
+    border: 1px solid #4A90E2 !important;
+    border-radius: 8px !important;
+    color: #F5F5F5 !important;
+}
+
+/* Main header styling */
+.main-header {
+    background: linear-gradient(135deg, #1E1E1E 0%, #2A2A2A 100%) !important;
+    border: 1px solid #4A90E2 !important;
+    border-radius: 15px !important;
+    padding: 25px !important;
+    margin-bottom: 25px !important;
+    text-align: center !important;
+}
+
+.main-header h1 {
+    color: #F5F5F5 !important;
+    font-size: 28px !important;
+    font-weight: bold !important;
+    margin: 0 !important;
+}
+
+.main-header p {
+    color: #AAAAAA !important;
+    font-size: 16px !important;
+    margin: 10px 0 0 0 !important;
+}
+
+/* Test section headers */
+.test-header {
+    border-bottom: 2px solid #4A90E2 !important;
+    padding-bottom: 10px !important;
+    margin-bottom: 20px !important;
+}
+
+.test-emoji {
+    font-size: 24px !important;
+    margin-right: 10px !important;
+}
+
+/* Success/failure indicators */
+.success-border {
+    border: 3px solid #28A745 !important;
+}
+
+.failure-border {
+    border: 3px solid #DC3545 !important;
+}
+"""
+
+# Mock data structure based on the provided mapping
+MOCK_RESULTS = {
+    "CLIP": {
+        "impostor_test": {
+            "total_tests": 50,
+            "correct": 50,
+            "uncertain": 50,
+            "incorrect": 0,
+            "accuracy": 100.0,
+            "sample_images": [
+                {"filename": "rick_owens_target_001.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_001_spring-2019-ready-to-wear/candidate_007.jpg"},
+                {"filename": "rick_owens_target_002.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_002_spring-2017-ready-to-wear/candidate_038.jpg"},
+                {"filename": "rick_owens_target_003.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_003_spring-2016-ready-to-wear/candidate_006.jpg"},
+                {"filename": "yohji_yamamoto_impostor.jpg", "confidence": 0.865, "correct": False, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_002_spring-2017-ready-to-wear/candidate_030.jpg"},
+                {"filename": "rick_owens_success_004.jpg", "confidence": 0.756, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_004_spring-2004-ready-to-wear/candidate_015.jpg"},
+                {"filename": "ann_demeulemeester_impostor.jpg", "confidence": 0.723, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_004_spring-2004-ready-to-wear/candidate_022.jpg"},
+                {"filename": "yohji_yamamoto_impostor_2.jpg", "confidence": 0.834, "correct": False, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_006_fall-2004-ready-to-wear/candidate_031.jpg"}
+            ]
+        },
+        "family_test": {
+            "target_image": "fall_2011_menswear_target.jpg",
+            "target_image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/QUERY.jpg",
+            "total_collections": 100,
+            "strong_recognition": 6,
+            "moderate_recognition": 5,
+            "weak_recognition": 2,
+            "avg_accuracy": 48.8,
+            "sample_results": [
+                {"filename": "spring_2010_correct_02.jpg", "confidence": 0.999, "correct": True, "image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/candidate_002.jpg"},
+                {"filename": "spring_2010_correct_08.jpg", "confidence": 0.987, "correct": True, "image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/candidate_008.jpg"},
+                {"filename": "fall_2016_wrong_01.jpg", "confidence": 1.0, "correct": False, "image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/candidate_001.jpg"},
+                {"filename": "spring_2006_wrong_04.jpg", "confidence": 0.956, "correct": False, "image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/candidate_004.jpg"},
+                {"filename": "fall_2003_wrong_06.jpg", "confidence": 0.943, "correct": False, "image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/candidate_006.jpg"},
+                {"filename": "spring_2012_wrong_07.jpg", "confidence": 0.891, "correct": False, "image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/candidate_007.jpg"},
+                {"filename": "spring_2010_correct_23.jpg", "confidence": 0.834, "correct": True, "image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/candidate_023.jpg"}
+            ]
+        },
+        "needle_test": {
+            "total_searches": 150,
+            "perfect_match": 136,
+            "close_match": 0,
+            "wrong_match": 14,
+            "accuracy": 90.0,
+            "sample_images": [
+                {"filename": "fall_2004_rw_37.jpg", "confidence": 1.0, "correct": True, "image_path": "test-images/tier1/gauntlet_sets/gauntlet_001_fall_2004/QUERY.jpg"},
+                {"filename": "fall_2008_rw_29.jpg", "confidence": 0.999, "correct": True, "image_path": "test-images/tier1/gauntlet_sets/gauntlet_002_fall_2008/candidate_002.jpg"},
+                {"filename": "fall_2024_rw_10.jpg", "confidence": 1.0, "correct": True, "image_path": "test-images/tier1/gauntlet_sets/gauntlet_003_fall_2024/candidate_010.jpg"},
+                {"filename": "fall_2013_rw_41.jpg", "confidence": 1.0, "correct": True, "image_path": "test-images/tier1/gauntlet_sets/gauntlet_004_fall_2013/candidate_004.jpg"},
+                {"filename": "spring_2007_rw_21.jpg", "confidence": 1.0, "correct": True, "image_path": "test-images/tier1/gauntlet_sets/gauntlet_005_spring_2007/candidate_015.jpg"},
+                {"filename": "spring_2013_mens_23.jpg", "confidence": 1.0, "correct": True, "image_path": "test-images/tier1/gauntlet_sets/gauntlet_006_spring_2013/candidate_018.jpg"},
+                {"filename": "fall_2003_rw_35.jpg", "confidence": 1.0, "correct": False, "image_path": "test-images/tier1/gauntlet_sets/gauntlet_007_fall_2003/candidate_012.jpg"}
+            ]
+        }
+    },
+    "SigLIP": {
+        "impostor_test": {
+            "total_tests": 50,
+            "correct": 50,
+            "uncertain": 0,
+            "incorrect": 0,
+            "accuracy": 100.0,
+            "sample_images": [
+                {"filename": "rick_owens_target_001.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_001_spring-2019-ready-to-wear/candidate_007.jpg"},
+                {"filename": "rick_owens_target_002.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_002_spring-2017-ready-to-wear/candidate_038.jpg"},
+                {"filename": "rick_owens_target_003.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_003_spring-2016-ready-to-wear/candidate_006.jpg"},
+                {"filename": "yohji_yamamoto_impostor.jpg", "confidence": 0.644, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_002_spring-2017-ready-to-wear/candidate_030.jpg"},
+                {"filename": "rick_owens_success_004.jpg", "confidence": 0.823, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_005_spring-2025-menswear/candidate_015.jpg"},
+                {"filename": "ann_demeulemeester_impostor.jpg", "confidence": 0.512, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_008_spring-2023-ready-to-wear/candidate_022.jpg"},
+                {"filename": "yohji_yamamoto_impostor_2.jpg", "confidence": 0.567, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_009_fall-2011-ready-to-wear/candidate_031.jpg"}
+            ]
+        },
+         "family_test": {
+            "target_image": "siglip_family_target.jpg",
+            "target_image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/QUERY.jpg",
+             "total_collections": 100,
+             "strong_recognition": 21,
+             "moderate_recognition": 0,
+             "weak_recognition": 0,
+            "avg_accuracy": 63.5,
+             "sample_results": [
+                {"filename": "siglip_family_01.jpg", "confidence": 0.987, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_001.jpg"},
+                {"filename": "siglip_family_02.jpg", "confidence": 0.934, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_002.jpg"},
+                {"filename": "siglip_family_03.jpg", "confidence": 0.891, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_003.jpg"},
+                {"filename": "siglip_family_04.jpg", "confidence": 0.956, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_004.jpg"},
+                {"filename": "siglip_family_05.jpg", "confidence": 0.978, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_005.jpg"},
+                {"filename": "siglip_family_06.jpg", "confidence": 0.915, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_006.jpg"},
+                {"filename": "siglip_family_07.jpg", "confidence": 0.942, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_007.jpg"}
+             ]
+         },
+         "needle_test": {
+             "total_searches": 150,
+             "perfect_match": 136,
+             "close_match": 0,
+             "wrong_match": 14,
+             "accuracy": 100.0,
+             "sample_images": [
+                {"filename": "siglip_needle_01.jpg", "confidence": 0.999, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_011.jpg"},
+                {"filename": "siglip_needle_02.jpg", "confidence": 0.994, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_012.jpg"},
+                {"filename": "siglip_needle_03.jpg", "confidence": 0.991, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_013.jpg"},
+                {"filename": "siglip_needle_04.jpg", "confidence": 0.996, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_014.jpg"},
+                {"filename": "siglip_needle_05.jpg", "confidence": 0.998, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_015.jpg"},
+                {"filename": "siglip_needle_06.jpg", "confidence": 0.993, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_016.jpg"},
+                {"filename": "siglip_needle_07.jpg", "confidence": 0.997, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_017.jpg"}
+             ]
+         }
+    },
+    "DINOv2": {
+        "impostor_test": {
+            "total_tests": 50,
+            "correct": 50,
+            "uncertain": 50,
+            "incorrect": 0,
+            "accuracy": 100.0,
+            "sample_images": [
+                {"filename": "rick_owens_target_001.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_001_spring-2019-ready-to-wear/candidate_007.jpg"},
+                {"filename": "rick_owens_target_002.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_002_spring-2017-ready-to-wear/candidate_038.jpg"},
+                {"filename": "rick_owens_target_003.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_003_spring-2016-ready-to-wear/candidate_006.jpg"},
+                {"filename": "ann_demeulemeester_impostor.jpg", "confidence": 0.606, "correct": False, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_002_spring-2017-ready-to-wear/candidate_002.jpg"},
+                {"filename": "ann_demeulemeester_impostor_2.jpg", "confidence": 0.596, "correct": False, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_002_spring-2017-ready-to-wear/candidate_032.jpg"},
+                {"filename": "rick_owens_success_004.jpg", "confidence": 0.487, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_005_spring-2025-menswear/candidate_015.jpg"},
+                {"filename": "yohji_yamamoto_impostor.jpg", "confidence": 0.612, "correct": False, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_007_spring-2019-menswear/candidate_044.jpg"}
+            ]
+        },
+        "family_test": {
+            "target_image": "fall_2011_menswear_target.jpg",
+            "target_image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/QUERY.jpg",
+            "total_collections": 100,
+            "strong_recognition": 9,
+            "moderate_recognition": 4,
+            "weak_recognition": 1,
+            "avg_accuracy": 48.6,
+            "sample_results": [
+                {"filename": "spring_2020_correct_39.jpg", "confidence": 1.0, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/candidate_039.jpg"},
+                {"filename": "fall_2015_wrong_51.jpg", "confidence": 0.918, "correct": False, "image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/candidate_051.jpg"},
+                {"filename": "spring_2020_correct_33.jpg", "confidence": 0.918, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/candidate_033.jpg"},
+                {"filename": "spring_2020_correct_25.jpg", "confidence": 0.85, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/candidate_025.jpg"},
+                {"filename": "spring_2020_correct_15.jpg", "confidence": 0.92, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/candidate_015.jpg"},
+                {"filename": "spring_2020_correct_27.jpg", "confidence": 0.88, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/candidate_027.jpg"},
+                {"filename": "fall_2003_wrong_82.jpg", "confidence": 0.82, "correct": False, "image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/candidate_082.jpg"}
+            ]
+        },
+                 "needle_test": {
+             "total_searches": 150,
+             "perfect_match": 136,
+             "close_match": 1,
+             "wrong_match": 14,
+             "accuracy": 71.4,
+             "sample_images": [
+                {"filename": "dinov2_needle_01.jpg", "confidence": 0.987, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_005_spring_2004/candidate_001.jpg"},
+                {"filename": "dinov2_needle_02.jpg", "confidence": 0.923, "correct": False, "image_path": "test-images/tier1/cohesion_sets/cohesion_005_spring_2004/candidate_002.jpg"},
+                {"filename": "dinov2_needle_03.jpg", "confidence": 0.891, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_005_spring_2004/candidate_003.jpg"},
+                {"filename": "dinov2_needle_04.jpg", "confidence": 0.956, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_005_spring_2004/candidate_004.jpg"},
+                {"filename": "dinov2_needle_05.jpg", "confidence": 0.834, "correct": False, "image_path": "test-images/tier1/cohesion_sets/cohesion_005_spring_2004/candidate_005.jpg"},
+                {"filename": "dinov2_needle_06.jpg", "confidence": 0.912, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_005_spring_2004/candidate_006.jpg"},
+                {"filename": "dinov2_needle_07.jpg", "confidence": 0.967, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_005_spring_2004/candidate_007.jpg"}
+            ]
+        }
+    }
+}
+
+def add_border(image_path, color):
+    """Add a colored border to an image using Pillow library."""
+    try:
+        if not os.path.exists(image_path):
+            # Return placeholder if image doesn't exist
+            return get_placeholder_path()
+        
+        # Open the image
+        img = Image.open(image_path)
+        
+        # Create a new image with border
+        border_width = 4
+        new_width = img.width + 2 * border_width
+        new_height = img.height + 2 * border_width
+        
+        # Create new image with border color
+        bordered_img = Image.new('RGB', (new_width, new_height), color)
+        
+        # Paste original image in center
+        bordered_img.paste(img, (border_width, border_width))
+        
+        # Save to temporary file
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+        bordered_img.save(temp_file.name)
+        
+        return temp_file.name
+        
+    except Exception as e:
+        print(f"Error adding border to {image_path}: {e}")
+        return get_placeholder_path()
+
+def get_placeholder_path():
+    """Return path to placeholder image."""
+    placeholder_path = "assets/placeholder.png"
+    if not os.path.exists(placeholder_path):
+        # Create a simple placeholder if it doesn't exist
+        os.makedirs("assets", exist_ok=True)
+        img = Image.new('RGB', (200, 200), '#2A2A2A')
+        draw = ImageDraw.Draw(img)
+        try:
+            # Try to get a font, fall back to default if not available
+            from PIL import ImageFont
+            font = ImageFont.load_default()
+            draw.text((60, 95), "No Image", fill='#AAAAAA', font=font)
+        except:
+            draw.text((60, 95), "No Image", fill='#AAAAAA')
+        img.save(placeholder_path)
+    return placeholder_path
+
+def create_gallery_data(images, test_type="impostor"):
+    """Create gallery data with enhanced captions based on test type."""
+    gallery_data = []
+    
+    for img_data in images:
+        # Determine border color based on correctness
+        border_color = "#28A745" if img_data['correct'] else "#DC3545"
+        
+        # Get image path (use placeholder if not available)
+        img_path = img_data.get('image_path', get_placeholder_path())
+        if not os.path.exists(img_path):
+            img_path = get_placeholder_path()
+        
+        # Add border
+        bordered_path = add_border(img_path, border_color)
+        
+        # Create enhanced caption based on test type
+        filename = img_data['filename']
+        confidence = img_data['confidence']
+        is_correct = img_data['correct']
+        
+        if test_type == "impostor":
+            # Extract brand from filename for impostor test
+            if "rick" in filename.lower():
+                brand = "Rick Owens"
+            elif "yohji" in filename.lower() or "yamamoto" in filename.lower():
+                brand = "Yohji Yamamoto"
+            elif "ann" in filename.lower():
+                brand = "Ann Demeulemeester"
+            else:
+                brand = "Rick Owens"  # Default
+            
+            status = "✅" if is_correct else "❌"
+            caption = f"{status} {brand} | Conf: {confidence:.3f}"
+            
+        elif test_type == "family":
+            # Extract collection info for family test
+            if "spring_2010" in filename.lower():
+                collection = "Spring 2010"
+            elif "fall_2016" in filename.lower():
+                collection = "Fall 2016"
+            elif "spring_2006" in filename.lower():
+                collection = "Spring 2006"
+            elif "fall_2003" in filename.lower():
+                collection = "Fall 2003"
+            else:
+                collection = "Spring 2010"  # Default
+            
+            status = "✅" if is_correct else "❌"
+            caption = f"{status} {collection} | Conf: {confidence:.3f}"
+            
+        elif test_type == "needle":
+            # Simple target vs impostor for needle test
+            if "target" in filename.lower() or confidence > 0.95:
+                label = "🎯 TARGET"
+            else:
+                label = "Impostor"
+            
+            caption = f"{label} | Conf: {confidence:.3f}"
+            
+        else:
+            # Fallback to original format
+            caption = f"{filename}\nConfidence: {confidence:.3f}"
+        
+        gallery_data.append((bordered_path, caption))
+    
+    return gallery_data
+
+def update_ui_for_model(model_name):
+    """Update the UI based on selected model."""
+    results = MOCK_RESULTS[model_name]
+    
+    # Get target image for family test
+    target_image_path = results['family_test'].get('target_image_path', get_placeholder_path())
+    if not os.path.exists(target_image_path):
+        target_image_path = get_placeholder_path()
+    
+    # Create gallery data for each test with appropriate type
+    impostor_gallery = create_gallery_data(results['impostor_test']['sample_images'], "impostor")
+    family_gallery = create_gallery_data(results['family_test']['sample_results'], "family")
+    needle_gallery = create_gallery_data(results['needle_test']['sample_images'], "needle")
+    
+    # Create statistics
+    # Calculate clarity for impostor test
+    successful_uncertainty = results['impostor_test']['total_tests'] - results['impostor_test']['uncertain']
+    flawed_uncertainty = results['impostor_test']['uncertain']
+    
+    impostor_stats = f"""
+**Results Summary:** {results['impostor_test']['total_tests']} Tests searching through **12,147 Rick Owens images** | **{successful_uncertainty}** Successful Uncertainty Checks | **{flawed_uncertainty}** Flawed Uncertainty Checks
+    """
+    
+    # Calculate clarity for family test
+    weak_cohesion = results['family_test']['total_collections'] - results['family_test']['strong_recognition']
+    
+    family_stats = f"""
+**Results Summary:** {results['family_test']['total_collections']} Collections Tested from **12,195 total images** | **{results['family_test']['strong_recognition']}** with Strong Cohesion | **{weak_cohesion}** with Weak Cohesion
+    """
+    
+    # Calculate clarity for needle test
+    failures = results['needle_test']['total_searches'] - results['needle_test']['perfect_match']
+    
+    needle_stats = f"""
+**Results Summary:** {results['needle_test']['total_searches']} Searches through **12,195 total images** | **{results['needle_test']['perfect_match']}** Perfect Matches | **{failures}** Failures
+    """
+    
+    return (
+        target_image_path,
+        impostor_gallery,
+        family_gallery, 
+        needle_gallery,
+        impostor_stats,
+        family_stats,
+        needle_stats
+    )
+
+def create_interface():
+    """Create the main Gradio interface."""
+    
+    with gr.Blocks(css=custom_css, theme=gr.themes.Base()) as demo:
+        
+        # Header
+        gr.HTML("""
+        <div class="main-header">
+            <h1>Caeliai Genesis 01: The Vision Benchmark</h1>
+            <p>Comprehensive analysis of vision models on Rick Owens fashion recognition tasks</p>
+            <p style="font-size: 14px; margin-top: 15px; color: #4A90E2;">Foundational research exploring computational approaches to fashion and aesthetic understanding</p>
+        </div>
+        """)
+        
+        # Model selector
+        with gr.Row():
+            model_dropdown = gr.Dropdown(
+                choices=["CLIP", "SigLIP", "DINOv2"],
+                value="DINOv2",
+                label="Select AI Model",
+                info="Choose which model's test results to display"
+            )
+        
+        # Test 1: Impostor Test
+        with gr.Group():
+            gr.Markdown("""
+            <div class="test-header">
+                <h2>Test 1: The Impostor Test</h2>
+                <h3 style="color: #4A90E2;">Brand vs. Brand Discrimination</h3>
+            </div>
+            
+            **Challenge:** Can the model spot a true Rick Owens piece among convincing "impostor" looks from other designers?
+            
+            **Why it's difficult:** Models only see pixels, not brand heritage. This tests if they can learn the subtle, unique "handwriting" of a designer, even when another designer's work looks very similar.
+            
+            **How it works:**
+            1. Model sees a Rick Owens image (query)
+            2. It must find other Rick Owens pieces from a pool contaminated with "impostor" looks from other designers
+            3. Model **FAILS** if it thinks an impostor is more similar than a real Rick Owens piece (a negative "noise gap")
+            """)
+            
+            impostor_stats_display = gr.Markdown()
+            impostor_gallery = gr.Gallery(
+                label="Test Results (Green = Success, Red = Failure)",
+                show_label=True,
+                elem_id="impostor_gallery",
+                columns=7,
+                rows=1,
+                height="auto"
+            )
+        
+        # Test 2: Family Resemblance Test
+        with gr.Group():
+            gr.Markdown("""
+            <div class="test-header">
+                <h2>Test 2: The Family Resemblance Test</h2>
+                <h3 style="color: #4A90E2;">Collection Cohesion</h3>
+            </div>
+            
+            **Challenge:** Does the model understand that looks from the same collection are part of a "family," even if they look very different?
+            
+            **Why it's difficult:** A single collection contains diverse pieces. The model must understand the core theme or mood, not just match colors or shapes.
+            
+            **How it works:**
+            1. Model sees a Rick Owens Spring 2010 piece (query image)
+            2. Model must find OTHER Rick Owens Spring 2010 pieces
+            3. Model gets it WRONG when it picks Rick Owens Fall 2016, Spring 2006, Fall 2003, etc.
+            4. The challenge: What makes Spring 2010 different from Fall 2016, even though both are Rick Owens?
+            """)
+            
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Markdown("**Query Image:**")
+                    target_image = gr.Image(
+                        label="Target Collection",
+                        show_label=False,
+                        height=200,
+                        width=200
+                    )
+                
+                with gr.Column(scale=3):
+                    family_stats_display = gr.Markdown()
+                    family_gallery = gr.Gallery(
+                        label="Collection Results (Green = Same Collection, Red = Wrong Collection)",
+                        show_label=True,
+                        elem_id="family_gallery",
+                        columns=7,
+                        rows=1,
+                        height="auto"
+                    )
+        
+        # Test 3: Needle in a Haystack Test
+        with gr.Group():
+            gr.Markdown("""
+            <div class="test-header">
+                <h2>Test 3: The Needle in a Haystack Test</h2>
+                <h3 style="color: #4A90E2;">Exact Match Precision</h3>
+            </div>
+            
+            **Challenge:** Can the model find the one identical image in a pile of extremely similar looks from the same show?
+            
+            **Why it's difficult:** This is a test of pure precision. The "haystack" is filled with items from the exact same collection, making the true duplicate incredibly difficult to spot.
+            
+            **How it works:**
+            1. Model receives one target image from a specific collection
+            2. It must find the EXACT SAME image hidden among 30+ very similar pieces from the same collection
+            3. Model **FAILS** if it picks a similar-but-different piece instead of the exact duplicate
+            4. The challenge: Spotting identical fabric patterns, poses, and details with pixel-perfect precision
+            """)
+            
+            needle_stats_display = gr.Markdown()
+            needle_gallery = gr.Gallery(
+                label="Search Results (Green = Perfect Match, Red = Wrong Match)",
+                show_label=True,
+                elem_id="needle_gallery",
+                columns=7,
+                rows=1,
+                height="auto"
+            )
+        
+        # Update function
+        model_dropdown.change(
+            fn=update_ui_for_model,
+            inputs=[model_dropdown],
+            outputs=[
+                target_image,
+                impostor_gallery,
+                family_gallery,
+                needle_gallery,
+                impostor_stats_display,
+                family_stats_display,
+                needle_stats_display
+            ]
+        )
+        
+        # Initialize with default model
+        demo.load(
+            fn=update_ui_for_model,
+            inputs=[model_dropdown],
+            outputs=[
+                target_image,
+                impostor_gallery,
+                family_gallery,
+                needle_gallery,
+                impostor_stats_display,
+                family_stats_display,
+                needle_stats_display
+            ]
+        )
+        
+        # Call to Action Section
+        gr.HTML("""
+        <div style="margin-top: 40px; padding: 30px; background: linear-gradient(135deg, #1E1E1E 0%, #2A2A2A 100%); border: 1px solid #4A90E2; border-radius: 15px; text-align: center;">
+            <hr style="border: none; height: 2px; background: #4A90E2; margin: 0 0 25px 0;">
+            <h3 style="color: #F5F5F5; font-size: 24px; margin-bottom: 15px;">Foundational Research</h3>
+            <p style="color: #AAAAAA; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
+                This benchmark represents foundational research into computational understanding of fashion and aesthetic principles. 
+                Our investigation continues into the fundamental challenges of visual understanding in complex design domains.
+            </p>
+            <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+                <a href="https://github.com/kalanpeace/Caeliai" target="_blank" style="
+                    display: inline-block; 
+                    padding: 12px 24px; 
+                    background: #4A90E2; 
+                    color: #F5F5F5; 
+                    text-decoration: none; 
+                    border-radius: 8px; 
+                    font-weight: 500;
+                    transition: background 0.3s ease;
+                ">
+                    ➡️ Follow our research on GitHub
+                </a>
+                <a href="docs/vision_benchmark_report.ipynb" target="_blank" style="
+                    display: inline-block; 
+                    padding: 12px 24px; 
+                    background: transparent; 
+                    color: #4A90E2; 
+                    text-decoration: none; 
+                    border: 1px solid #4A90E2; 
+                    border-radius: 8px; 
+                    font-weight: 500;
+                    transition: all 0.3s ease;
+                ">
+                    ➡️ Read the technical report
+                </a>
+            </div>
+        </div>
+        """)
+    
+    return demo
+
+if __name__ == "__main__":
+    # Create and launch the interface
+    demo = create_interface()
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=7861,
+        share=True,
+        debug=True
+    ) 

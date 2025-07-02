@@ -1,0 +1,54 @@
+# Fashion AI Uncertainty Detection - M4 Mac Optimized
+# Tested on Apple M4 MacBook with Python 3.12
+
+# Core ML Framework
+torch>=2.1.0
+torchvision>=0.16.0
+
+# Vision Models
+clip-by-openai>=1.0
+transformers>=4.35.0
+timm>=0.9.0
+
+# Image Processing
+Pillow>=10.0.0
+opencv-python>=4.8.0
+
+# Vector Database
+pinecone-client>=2.2.4
+
+# Scientific Computing (M4 optimized)
+numpy>=1.24.0
+scipy>=1.11.0
+
+# Data Processing
+pandas>=2.0.0
+datasets>=2.14.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.15.0
+
+# Jupyter Notebooks
+jupyter>=1.0.0
+ipywidgets>=8.0.0
+
+# Progress Tracking
+tqdm>=4.65.0
+
+# File Handling
+pathlib2>=2.3.7
+
+# Optional: LLM Integration
+openai>=1.0.0  # For LLM sanity checking
+anthropic>=0.5.0  # Alternative LLM provider
+
+# Optional: HuggingFace Spaces
+gradio>=4.0.0  # For interactive demos
+streamlit>=1.28.0  # Alternative UI framework
+
+# Development Tools
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0 
