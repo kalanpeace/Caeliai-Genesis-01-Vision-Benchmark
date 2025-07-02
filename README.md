@@ -15,17 +15,17 @@ A systematic benchmark comparing CLIP, SigLIP, and DINOv2 on Rick Owens fashion 
 **Winner: SigLIP** - Only model with proper uncertainty detection + superior aesthetic understanding.
 
 ### Uncertainty Detection
-![Uncertainty Detection Results](uncertainty_detection_plot.png)
+![Uncertainty Detection Results](./images/uncertainty_detection_plot.png)
 
 **Critical Finding:** Only SigLIP shows positive noise gap (+0.079), meaning it properly detects when impostor designs don't belong. CLIP and DINOv2 show dangerous overconfidence with negative gaps.
 
 ### Aesthetic Cohesion  
-![Aesthetic Cohesion Results](aesthetic_cohesion_plot.png)
+![Aesthetic Cohesion Results](./images/aesthetic_cohesion_plot.png)
 
 **SigLIP dominates** with 63.5% collection purity vs ~48% for CLIP/DINOv2, demonstrating superior understanding of fashion narratives and seasonal moods.
 
 ### Processing Performance
-![Processing Time Results](processing_time_plot.png)
+![Processing Time Results](./images/processing_time_plot.png)
 
 **Trade-off:** SigLIP's superior intelligence comes at 9.6x processing cost (30.1s vs 3.1-4.2s), but the accuracy gains demonstrate significant advances in computational understanding of fashion aesthetics.
 
