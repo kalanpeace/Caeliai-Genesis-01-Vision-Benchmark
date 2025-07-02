@@ -41,12 +41,13 @@ A systematic benchmark comparing CLIP, SigLIP, and DINOv2 on Rick Owens fashion 
 
 **Interactive Demo:**
 ```bash
-python3 fashion_ai_benchmark_ui.py
+cd app
+python3 app.py
 ```
 
 **Technical Report:**
 ```bash
-jupyter notebook vision_benchmark_report.ipynb
+jupyter notebook docs/vision_benchmark_report.ipynb
 ```
 
 **Requirements:**
