@@ -39,6 +39,7 @@ tqdm>=4.65.0
 
 # File Handling
 pathlib2>=2.3.7
+requests>=2.31.0
 
 # Optional: LLM Integration
 openai>=1.0.0  # For LLM sanity checking

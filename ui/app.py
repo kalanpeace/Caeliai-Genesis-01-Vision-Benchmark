@@ -4,6 +4,11 @@ import os
 from pathlib import Path
 from PIL import Image, ImageDraw
 import tempfile
+import requests
+from io import BytesIO
+
+# GitHub repository base URL for loading images
+GITHUB_REPO_URL = "https://raw.githubusercontent.com/kalanpeace/Caeliai-Genesis-01-Vision-Benchmark/main/"
 
 # Custom CSS for dark theme with exact color specifications
 custom_css = """
@@ -152,31 +157,31 @@ MOCK_RESULTS = {
             "incorrect": 0,
             "accuracy": 100.0,
             "sample_images": [
-                {"filename": "rick_owens_target_001.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_001_spring-2019-ready-to-wear/candidate_007.jpg"},
-                {"filename": "rick_owens_target_002.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_002_spring-2017-ready-to-wear/candidate_038.jpg"},
-                {"filename": "rick_owens_target_003.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_003_spring-2016-ready-to-wear/candidate_006.jpg"},
-                {"filename": "yohji_yamamoto_impostor.jpg", "confidence": 0.865, "correct": False, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_002_spring-2017-ready-to-wear/candidate_030.jpg"},
-                {"filename": "rick_owens_success_004.jpg", "confidence": 0.756, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_004_spring-2004-ready-to-wear/candidate_015.jpg"},
-                {"filename": "ann_demeulemeester_impostor.jpg", "confidence": 0.723, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_004_spring-2004-ready-to-wear/candidate_022.jpg"},
-                {"filename": "yohji_yamamoto_impostor_2.jpg", "confidence": 0.834, "correct": False, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_006_fall-2004-ready-to-wear/candidate_031.jpg"}
+                {"filename": "rick_owens_target_001.jpg", "confidence": 1.0, "correct": True, "image_path": "images/rick_owens_target_001.jpg"},
+                {"filename": "rick_owens_target_002.jpg", "confidence": 1.0, "correct": True, "image_path": "images/rick_owens_target_002.jpg"},
+                {"filename": "rick_owens_target_003.jpg", "confidence": 1.0, "correct": True, "image_path": "images/rick_owens_target_003.jpg"},
+                {"filename": "yohji_yamamoto_impostor.jpg", "confidence": 0.865, "correct": False, "image_path": "images/yohji_yamamoto_impostor.jpg"},
+                {"filename": "rick_owens_success_004.jpg", "confidence": 0.756, "correct": True, "image_path": "images/rick_owens_success_004.jpg"},
+                {"filename": "ann_demeulemeester_impostor.jpg", "confidence": 0.723, "correct": True, "image_path": "images/ann_demeulemeester_impostor.jpg"},
+                {"filename": "yohji_yamamoto_impostor_2.jpg", "confidence": 0.834, "correct": False, "image_path": "images/yohji_yamamoto_impostor_2.jpg"}
             ]
         },
         "family_test": {
             "target_image": "fall_2011_menswear_target.jpg",
-            "target_image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/QUERY.jpg",
+            "target_image_path": "images/clip_family_target.jpg",
             "total_collections": 100,
             "strong_recognition": 6,
             "moderate_recognition": 5,
             "weak_recognition": 2,
             "avg_accuracy": 48.8,
             "sample_results": [
-                {"filename": "spring_2010_correct_02.jpg", "confidence": 0.999, "correct": True, "image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/candidate_002.jpg"},
-                {"filename": "spring_2010_correct_08.jpg", "confidence": 0.987, "correct": True, "image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/candidate_008.jpg"},
-                {"filename": "fall_2016_wrong_01.jpg", "confidence": 1.0, "correct": False, "image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/candidate_001.jpg"},
-                {"filename": "spring_2006_wrong_04.jpg", "confidence": 0.956, "correct": False, "image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/candidate_004.jpg"},
-                {"filename": "fall_2003_wrong_06.jpg", "confidence": 0.943, "correct": False, "image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/candidate_006.jpg"},
-                {"filename": "spring_2012_wrong_07.jpg", "confidence": 0.891, "correct": False, "image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/candidate_007.jpg"},
-                {"filename": "spring_2010_correct_23.jpg", "confidence": 0.834, "correct": True, "image_path": "test-images/tier1-production/cohesion_sets/cohesion_001_spring_2010/candidate_023.jpg"}
+                {"filename": "spring_2010_correct_02.jpg", "confidence": 0.999, "correct": True, "image_path": "images/spring_2010_correct_02.jpg"},
+                {"filename": "spring_2010_correct_08.jpg", "confidence": 0.987, "correct": True, "image_path": "images/spring_2010_correct_08.jpg"},
+                {"filename": "fall_2016_wrong_01.jpg", "confidence": 1.0, "correct": False, "image_path": "images/fall_2016_wrong_01.jpg"},
+                {"filename": "spring_2006_wrong_04.jpg", "confidence": 0.956, "correct": False, "image_path": "images/spring_2006_wrong_04.jpg"},
+                {"filename": "fall_2003_wrong_06.jpg", "confidence": 0.943, "correct": False, "image_path": "images/fall_2003_wrong_06.jpg"},
+                {"filename": "spring_2012_wrong_07.jpg", "confidence": 0.891, "correct": False, "image_path": "images/spring_2012_wrong_07.jpg"},
+                {"filename": "spring_2010_correct_23.jpg", "confidence": 0.834, "correct": True, "image_path": "images/spring_2010_correct_23.jpg"}
             ]
         },
         "needle_test": {
@@ -186,13 +191,13 @@ MOCK_RESULTS = {
             "wrong_match": 14,
             "accuracy": 90.0,
             "sample_images": [
-                {"filename": "fall_2004_rw_37.jpg", "confidence": 1.0, "correct": True, "image_path": "test-images/tier1/gauntlet_sets/gauntlet_001_fall_2004/QUERY.jpg"},
-                {"filename": "fall_2008_rw_29.jpg", "confidence": 0.999, "correct": True, "image_path": "test-images/tier1/gauntlet_sets/gauntlet_002_fall_2008/candidate_002.jpg"},
-                {"filename": "fall_2024_rw_10.jpg", "confidence": 1.0, "correct": True, "image_path": "test-images/tier1/gauntlet_sets/gauntlet_003_fall_2024/candidate_010.jpg"},
-                {"filename": "fall_2013_rw_41.jpg", "confidence": 1.0, "correct": True, "image_path": "test-images/tier1/gauntlet_sets/gauntlet_004_fall_2013/candidate_004.jpg"},
-                {"filename": "spring_2007_rw_21.jpg", "confidence": 1.0, "correct": True, "image_path": "test-images/tier1/gauntlet_sets/gauntlet_005_spring_2007/candidate_015.jpg"},
-                {"filename": "spring_2013_mens_23.jpg", "confidence": 1.0, "correct": True, "image_path": "test-images/tier1/gauntlet_sets/gauntlet_006_spring_2013/candidate_018.jpg"},
-                {"filename": "fall_2003_rw_35.jpg", "confidence": 1.0, "correct": False, "image_path": "test-images/tier1/gauntlet_sets/gauntlet_007_fall_2003/candidate_012.jpg"}
+                {"filename": "fall_2004_rw_37.jpg", "confidence": 1.0, "correct": True, "image_path": "images/fall_2004_rw_37.jpg"},
+                {"filename": "fall_2008_rw_29.jpg", "confidence": 0.999, "correct": True, "image_path": "images/fall_2008_rw_29.jpg"},
+                {"filename": "fall_2024_rw_10.jpg", "confidence": 1.0, "correct": True, "image_path": "images/fall_2024_rw_10.jpg"},
+                {"filename": "fall_2013_rw_41.jpg", "confidence": 1.0, "correct": True, "image_path": "images/fall_2013_rw_41.jpg"},
+                {"filename": "spring_2007_rw_21.jpg", "confidence": 1.0, "correct": True, "image_path": "images/spring_2007_rw_21.jpg"},
+                {"filename": "spring_2013_mens_23.jpg", "confidence": 1.0, "correct": True, "image_path": "images/spring_2013_mens_23.jpg"},
+                {"filename": "fall_2003_rw_35.jpg", "confidence": 1.0, "correct": False, "image_path": "images/fall_2003_rw_35.jpg"}
             ]
         }
     },
@@ -204,31 +209,31 @@ MOCK_RESULTS = {
             "incorrect": 0,
             "accuracy": 100.0,
             "sample_images": [
-                {"filename": "rick_owens_target_001.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_001_spring-2019-ready-to-wear/candidate_007.jpg"},
-                {"filename": "rick_owens_target_002.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_002_spring-2017-ready-to-wear/candidate_038.jpg"},
-                {"filename": "rick_owens_target_003.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_003_spring-2016-ready-to-wear/candidate_006.jpg"},
-                {"filename": "yohji_yamamoto_impostor.jpg", "confidence": 0.644, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_002_spring-2017-ready-to-wear/candidate_030.jpg"},
-                {"filename": "rick_owens_success_004.jpg", "confidence": 0.823, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_005_spring-2025-menswear/candidate_015.jpg"},
-                {"filename": "ann_demeulemeester_impostor.jpg", "confidence": 0.512, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_008_spring-2023-ready-to-wear/candidate_022.jpg"},
-                {"filename": "yohji_yamamoto_impostor_2.jpg", "confidence": 0.567, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_009_fall-2011-ready-to-wear/candidate_031.jpg"}
+                {"filename": "rick_owens_target_001.jpg", "confidence": 1.0, "correct": True, "image_path": "images/rick_owens_target_001.jpg"},
+                {"filename": "rick_owens_target_002.jpg", "confidence": 1.0, "correct": True, "image_path": "images/rick_owens_target_002.jpg"},
+                {"filename": "rick_owens_target_003.jpg", "confidence": 1.0, "correct": True, "image_path": "images/rick_owens_target_003.jpg"},
+                {"filename": "yohji_yamamoto_impostor.jpg", "confidence": 0.644, "correct": True, "image_path": "images/yohji_yamamoto_impostor.jpg"},
+                {"filename": "rick_owens_success_004.jpg", "confidence": 0.823, "correct": True, "image_path": "images/rick_owens_success_004_siglip.jpg"},
+                {"filename": "ann_demeulemeester_impostor.jpg", "confidence": 0.512, "correct": True, "image_path": "images/ann_demeulemeester_impostor_siglip.jpg"},
+                {"filename": "yohji_yamamoto_impostor_2.jpg", "confidence": 0.567, "correct": True, "image_path": "images/yohji_yamamoto_impostor_2_siglip.jpg"}
             ]
         },
          "family_test": {
             "target_image": "siglip_family_target.jpg",
-            "target_image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/QUERY.jpg",
+            "target_image_path": "images/siglip_family_target.jpg",
              "total_collections": 100,
              "strong_recognition": 21,
              "moderate_recognition": 0,
              "weak_recognition": 0,
             "avg_accuracy": 63.5,
              "sample_results": [
-                {"filename": "siglip_family_01.jpg", "confidence": 0.987, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_001.jpg"},
-                {"filename": "siglip_family_02.jpg", "confidence": 0.934, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_002.jpg"},
-                {"filename": "siglip_family_03.jpg", "confidence": 0.891, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_003.jpg"},
-                {"filename": "siglip_family_04.jpg", "confidence": 0.956, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_004.jpg"},
-                {"filename": "siglip_family_05.jpg", "confidence": 0.978, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_005.jpg"},
-                {"filename": "siglip_family_06.jpg", "confidence": 0.915, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_006.jpg"},
-                {"filename": "siglip_family_07.jpg", "confidence": 0.942, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_007.jpg"}
+                {"filename": "siglip_family_01.jpg", "confidence": 0.987, "correct": True, "image_path": "images/siglip_family_01.jpg"},
+                {"filename": "siglip_family_02.jpg", "confidence": 0.934, "correct": True, "image_path": "images/siglip_family_02.jpg"},
+                {"filename": "siglip_family_03.jpg", "confidence": 0.891, "correct": True, "image_path": "images/siglip_family_03.jpg"},
+                {"filename": "siglip_family_04.jpg", "confidence": 0.956, "correct": True, "image_path": "images/siglip_family_04.jpg"},
+                {"filename": "siglip_family_05.jpg", "confidence": 0.978, "correct": True, "image_path": "images/siglip_family_05.jpg"},
+                {"filename": "siglip_family_06.jpg", "confidence": 0.915, "correct": True, "image_path": "images/siglip_family_06.jpg"},
+                {"filename": "siglip_family_07.jpg", "confidence": 0.942, "correct": True, "image_path": "images/siglip_family_07.jpg"}
              ]
          },
          "needle_test": {
@@ -238,13 +243,13 @@ MOCK_RESULTS = {
              "wrong_match": 14,
              "accuracy": 100.0,
              "sample_images": [
-                {"filename": "siglip_needle_01.jpg", "confidence": 0.999, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_011.jpg"},
-                {"filename": "siglip_needle_02.jpg", "confidence": 0.994, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_012.jpg"},
-                {"filename": "siglip_needle_03.jpg", "confidence": 0.991, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_013.jpg"},
-                {"filename": "siglip_needle_04.jpg", "confidence": 0.996, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_014.jpg"},
-                {"filename": "siglip_needle_05.jpg", "confidence": 0.998, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_015.jpg"},
-                {"filename": "siglip_needle_06.jpg", "confidence": 0.993, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_016.jpg"},
-                {"filename": "siglip_needle_07.jpg", "confidence": 0.997, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_003_fall_2015/candidate_017.jpg"}
+                {"filename": "siglip_needle_01.jpg", "confidence": 0.999, "correct": True, "image_path": "images/siglip_needle_01.jpg"},
+                {"filename": "siglip_needle_02.jpg", "confidence": 0.994, "correct": True, "image_path": "images/siglip_needle_02.jpg"},
+                {"filename": "siglip_needle_03.jpg", "confidence": 0.991, "correct": True, "image_path": "images/siglip_needle_03.jpg"},
+                {"filename": "siglip_needle_04.jpg", "confidence": 0.996, "correct": True, "image_path": "images/siglip_needle_04.jpg"},
+                {"filename": "siglip_needle_05.jpg", "confidence": 0.998, "correct": True, "image_path": "images/siglip_needle_05.jpg"},
+                {"filename": "siglip_needle_06.jpg", "confidence": 0.993, "correct": True, "image_path": "images/siglip_needle_06.jpg"},
+                {"filename": "siglip_needle_07.jpg", "confidence": 0.997, "correct": True, "image_path": "images/siglip_needle_07.jpg"}
              ]
          }
     },
@@ -256,31 +261,31 @@ MOCK_RESULTS = {
             "incorrect": 0,
             "accuracy": 100.0,
             "sample_images": [
-                {"filename": "rick_owens_target_001.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_001_spring-2019-ready-to-wear/candidate_007.jpg"},
-                {"filename": "rick_owens_target_002.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_002_spring-2017-ready-to-wear/candidate_038.jpg"},
-                {"filename": "rick_owens_target_003.jpg", "confidence": 1.0, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_003_spring-2016-ready-to-wear/candidate_006.jpg"},
-                {"filename": "ann_demeulemeester_impostor.jpg", "confidence": 0.606, "correct": False, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_002_spring-2017-ready-to-wear/candidate_002.jpg"},
-                {"filename": "ann_demeulemeester_impostor_2.jpg", "confidence": 0.596, "correct": False, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_002_spring-2017-ready-to-wear/candidate_032.jpg"},
-                {"filename": "rick_owens_success_004.jpg", "confidence": 0.487, "correct": True, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_005_spring-2025-menswear/candidate_015.jpg"},
-                {"filename": "yohji_yamamoto_impostor.jpg", "confidence": 0.612, "correct": False, "image_path": "Caeliai-Genesis/test-images/designer-noise/gauntlet_sets/designer_gauntlet_007_spring-2019-menswear/candidate_044.jpg"}
+                {"filename": "rick_owens_target_001.jpg", "confidence": 1.0, "correct": True, "image_path": "images/rick_owens_target_001.jpg"},
+                {"filename": "rick_owens_target_002.jpg", "confidence": 1.0, "correct": True, "image_path": "images/rick_owens_target_002.jpg"},
+                {"filename": "rick_owens_target_003.jpg", "confidence": 1.0, "correct": True, "image_path": "images/rick_owens_target_003.jpg"},
+                {"filename": "ann_demeulemeester_impostor.jpg", "confidence": 0.606, "correct": False, "image_path": "images/ann_demeulemeester_impostor_dinov2.jpg"},
+                {"filename": "ann_demeulemeester_impostor_2.jpg", "confidence": 0.596, "correct": False, "image_path": "images/ann_demeulemeester_impostor_2_dinov2.jpg"},
+                {"filename": "rick_owens_success_004.jpg", "confidence": 0.487, "correct": True, "image_path": "images/rick_owens_success_004.jpg"},
+                {"filename": "yohji_yamamoto_impostor.jpg", "confidence": 0.612, "correct": False, "image_path": "images/yohji_yamamoto_impostor_dinov2.jpg"}
             ]
         },
         "family_test": {
             "target_image": "fall_2011_menswear_target.jpg",
-            "target_image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/QUERY.jpg",
+            "target_image_path": "images/dinov2_family_target.jpg",
             "total_collections": 100,
             "strong_recognition": 9,
             "moderate_recognition": 4,
             "weak_recognition": 1,
             "avg_accuracy": 48.6,
             "sample_results": [
-                {"filename": "spring_2020_correct_39.jpg", "confidence": 1.0, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/candidate_039.jpg"},
-                {"filename": "fall_2015_wrong_51.jpg", "confidence": 0.918, "correct": False, "image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/candidate_051.jpg"},
-                {"filename": "spring_2020_correct_33.jpg", "confidence": 0.918, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/candidate_033.jpg"},
-                {"filename": "spring_2020_correct_25.jpg", "confidence": 0.85, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/candidate_025.jpg"},
-                {"filename": "spring_2020_correct_15.jpg", "confidence": 0.92, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/candidate_015.jpg"},
-                {"filename": "spring_2020_correct_27.jpg", "confidence": 0.88, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/candidate_027.jpg"},
-                {"filename": "fall_2003_wrong_82.jpg", "confidence": 0.82, "correct": False, "image_path": "test-images/tier1/cohesion_sets/cohesion_004_spring_2020/candidate_082.jpg"}
+                {"filename": "spring_2020_correct_39.jpg", "confidence": 1.0, "correct": True, "image_path": "images/spring_2020_correct_39.jpg"},
+                {"filename": "fall_2015_wrong_51.jpg", "confidence": 0.918, "correct": False, "image_path": "images/fall_2015_wrong_51.jpg"},
+                {"filename": "spring_2020_correct_33.jpg", "confidence": 0.918, "correct": True, "image_path": "images/spring_2020_correct_33.jpg"},
+                {"filename": "spring_2020_correct_25.jpg", "confidence": 0.85, "correct": True, "image_path": "images/spring_2020_correct_25.jpg"},
+                {"filename": "spring_2020_correct_15.jpg", "confidence": 0.92, "correct": True, "image_path": "images/spring_2020_correct_15.jpg"},
+                {"filename": "spring_2020_correct_27.jpg", "confidence": 0.88, "correct": True, "image_path": "images/spring_2020_correct_27.jpg"},
+                {"filename": "fall_2003_wrong_82.jpg", "confidence": 0.82, "correct": False, "image_path": "images/fall_2003_wrong_82.jpg"}
             ]
         },
                  "needle_test": {
@@ -290,27 +295,32 @@ MOCK_RESULTS = {
              "wrong_match": 14,
              "accuracy": 71.4,
              "sample_images": [
-                {"filename": "dinov2_needle_01.jpg", "confidence": 0.987, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_005_spring_2004/candidate_001.jpg"},
-                {"filename": "dinov2_needle_02.jpg", "confidence": 0.923, "correct": False, "image_path": "test-images/tier1/cohesion_sets/cohesion_005_spring_2004/candidate_002.jpg"},
-                {"filename": "dinov2_needle_03.jpg", "confidence": 0.891, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_005_spring_2004/candidate_003.jpg"},
-                {"filename": "dinov2_needle_04.jpg", "confidence": 0.956, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_005_spring_2004/candidate_004.jpg"},
-                {"filename": "dinov2_needle_05.jpg", "confidence": 0.834, "correct": False, "image_path": "test-images/tier1/cohesion_sets/cohesion_005_spring_2004/candidate_005.jpg"},
-                {"filename": "dinov2_needle_06.jpg", "confidence": 0.912, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_005_spring_2004/candidate_006.jpg"},
-                {"filename": "dinov2_needle_07.jpg", "confidence": 0.967, "correct": True, "image_path": "test-images/tier1/cohesion_sets/cohesion_005_spring_2004/candidate_007.jpg"}
+                {"filename": "dinov2_needle_01.jpg", "confidence": 0.987, "correct": True, "image_path": "images/dinov2_needle_01.jpg"},
+                {"filename": "dinov2_needle_02.jpg", "confidence": 0.923, "correct": False, "image_path": "images/dinov2_needle_02.jpg"},
+                {"filename": "dinov2_needle_03.jpg", "confidence": 0.891, "correct": True, "image_path": "images/dinov2_needle_03.jpg"},
+                {"filename": "dinov2_needle_04.jpg", "confidence": 0.956, "correct": True, "image_path": "images/dinov2_needle_04.jpg"},
+                {"filename": "dinov2_needle_05.jpg", "confidence": 0.834, "correct": False, "image_path": "images/dinov2_needle_05.jpg"},
+                {"filename": "dinov2_needle_06.jpg", "confidence": 0.912, "correct": True, "image_path": "images/dinov2_needle_06.jpg"},
+                {"filename": "dinov2_needle_07.jpg", "confidence": 0.967, "correct": True, "image_path": "images/dinov2_needle_07.jpg"}
             ]
         }
     }
 }
 
-def add_border(image_path, color):
+def add_border(image_source, color):
     """Add a colored border to an image using Pillow library."""
     try:
-        if not os.path.exists(image_path):
-            # Return placeholder if image doesn't exist
-            return get_placeholder_path()
-        
-        # Open the image
-        img = Image.open(image_path)
+        # Check if image_source is a URL or local path
+        if image_source.startswith(('http://', 'https://')):
+            # Fetch the image from URL
+            response = requests.get(image_source, timeout=10)
+            response.raise_for_status()
+            img = Image.open(BytesIO(response.content)).convert("RGB")
+        else:
+            # Local file path
+            if not os.path.exists(image_source):
+                return get_placeholder_path()
+            img = Image.open(image_source)
         
         # Create a new image with border
         border_width = 4
@@ -330,7 +340,7 @@ def add_border(image_path, color):
         return temp_file.name
         
     except Exception as e:
-        print(f"Error adding border to {image_path}: {e}")
+        print(f"Error adding border to {image_source}: {e}")
         return get_placeholder_path()
 
 def get_placeholder_path():
@@ -359,13 +369,12 @@ def create_gallery_data(images, test_type="impostor"):
         # Determine border color based on correctness
         border_color = "#28A745" if img_data['correct'] else "#DC3545"
         
-        # Get image path (use placeholder if not available)
-        img_path = img_data.get('image_path', get_placeholder_path())
-        if not os.path.exists(img_path):
-            img_path = get_placeholder_path()
+        # Get image URL from GitHub repository
+        image_relative_path = img_data.get('image_path', 'images/placeholder.png')
+        image_url = GITHUB_REPO_URL + image_relative_path
         
         # Add border
-        bordered_path = add_border(img_path, border_color)
+        bordered_path = add_border(image_url, border_color)
         
         # Create enhanced caption based on test type
         filename = img_data['filename']
@@ -423,10 +432,9 @@ def update_ui_for_model(model_name):
     """Update the UI based on selected model."""
     results = MOCK_RESULTS[model_name]
     
-    # Get target image for family test
-    target_image_path = results['family_test'].get('target_image_path', get_placeholder_path())
-    if not os.path.exists(target_image_path):
-        target_image_path = get_placeholder_path()
+    # Get target image URL for family test
+    target_image_relative_path = results['family_test'].get('target_image_path', 'images/placeholder.png')
+    target_image_url = GITHUB_REPO_URL + target_image_relative_path
     
     # Create gallery data for each test with appropriate type
     impostor_gallery = create_gallery_data(results['impostor_test']['sample_images'], "impostor")
@@ -457,7 +465,7 @@ def update_ui_for_model(model_name):
     """
     
     return (
-        target_image_path,
+        target_image_url,
         impostor_gallery,
         family_gallery, 
         needle_gallery,
